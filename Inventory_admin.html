@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>👑 管理員面板</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', 'Noto Sans TC', sans-serif; }
+        .status-completed { background-color: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 9999px; font-size: 0.875rem; font-weight: 500; }
+        .status-pending { background-color: #ffedd5; color: #9a3412; padding: 2px 8px; border-radius: 9999px; font-size: 0.875rem; font-weight: 500; }
+        .toast { position: fixed; top: 20px; right: 20px; background-color: #22c55e; color: white; padding: 1rem 1.5rem; border-radius: 0.5rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transform: translateX(200%); transition: transform 0.5s ease-in-out; z-index: 100; }
+        .toast.show { transform: translateX(0); }
+        .edit-input {
+            width: 100%;
+            padding: 0.25rem 0.5rem;
+            border: 1px solid #6366f1;
+            border-radius: 0.375rem;
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+        }
+        .sort-indicator {
+            display: inline-block;
+            margin-left: 0.25rem;
+            color: #9ca3af; /* gray-400 */
+            opacity: 0.5;
+            transition: opacity 0.2s;
+        }
+        th[data-sort-by]:hover .sort-indicator {
+            opacity: 1;
+        }
+        th.sorted .sort-indicator {
+            opacity: 1;
+            color: #1f2937; /* gray-800 */
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-7xl">
+        <header class="text-center mb-10">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">測試機盤點管理員👩🏼‍🔬</h1>
+        </header>
+
+        <!-- ========== 管理員操作區塊 ========== -->
+        <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200">
+            <div class="space-y-6">
+                <!-- 建立財產編號 -->
+                <div>
+                    <div class="flex items-center gap-2 mb-4">
+                        <h3 class="font-bold text-lg whitespace-nowrap">建立本次盤點表任務名稱：</h3>
+                        <input type="text" id="inventory-name" class="block w-full shadow-sm sm:text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" placeholder="例如：2025年8月_測試機盤點📲">
+                    </div>
+                    
+                    <label class="block text-sm font-medium text-gray-700">匯入盤點資訊</label>
+                    <p class="text-xs text-gray-500">CSV 格式：財產編號,設備使用者,資產擁有者 (無需標頭)</p>
+                    
+                    <div class="mt-2">
+                        <input type="file" id="csv-file-input" class="hidden" accept=".csv, text/csv">
+                        <button id="csv-import-btn" type="button" class="w-full sm:w-auto bg-teal-600 text-white font-bold py-2 px-4 rounded-md hover:bg-teal-700 transition text-sm">➕ 匯入CSV</button>
+                    </div>
+                </div>
+                
+                <!-- 盤點狀態總覽 -->
+                <div>
+                    <h3 class="font-bold text-lg">盤點狀態總覽</h3>
+                    <div class="flex justify-between items-center mb-2 flex-wrap gap-2">
+                        <button id="refresh-btn" class="bg-blue-500 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-600 transition duration-150 ease-in-out text-sm">✍🏻 更新最新上傳狀態</button>
+                        <button id="export-btn" class="bg-gray-700 text-white font-bold py-2 px-4 rounded-md hover:bg-gray-800 transition duration-150 ease-in-out text-sm">📤 匯出盤點結果</button>
+                    </div>
+
+                    <div class="overflow-x-auto border border-gray-200 rounded-lg max-h-[40rem]">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead id="table-header" class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3 text-left text-lg font-bold text-gray-700 cursor-pointer" data-sort-by="assetNumber">財產編號<span class="sort-indicator"></span></th>
+                                    <th scope="col" class="px-6 py-3 text-left text-lg font-bold text-gray-700">辨識編號</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-lg font-bold text-gray-700 cursor-pointer" data-sort-by="status">狀態<span class="sort-indicator"></span></th>
+                                    <th scope="col" class="px-6 py-3 text-left text-lg font-bold text-gray-700">照片</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-lg font-bold text-gray-700 cursor-pointer" data-sort-by="user">設備使用者<span class="sort-indicator"></span></th>
+                                    <th scope="col" class="px-6 py-3 text-left text-lg font-bold text-gray-700 cursor-pointer" data-sort-by="owner">資產擁有者<span class="sort-indicator"></span></th>
+                                    <th scope="col" class="px-6 py-3 text-left text-lg font-bold text-gray-700">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-table-body" class="bg-white divide-y divide-gray-200">
+                                <!-- 資料將由 JS 動態生成 -->
+                                <tr><td colspan="7" class="p-4 text-center text-gray-500">目前無盤點資料</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast-notification" class="toast"></div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // ========== DOM 元素 ==========
+    const adminTableBody = document.getElementById('admin-table-body');
+    const tableHeader = document.getElementById('table-header');
+    const exportBtn = document.getElementById('export-btn');
+    const refreshBtn = document.getElementById('refresh-btn');
+    const toast = document.getElementById('toast-notification');
+    const csvImportBtn = document.getElementById('csv-import-btn');
+    const csvFileInput = document.getElementById('csv-file-input');
+
+    // ========== 資料庫 & 狀態 ==========
+    const STORAGE_KEY = 'inventoryData';
+    let inventoryData = [];
+    let currentSort = { key: 'id', dir: 'asc' };
+
+    // ========== 核心功能 ==========
+    function loadData() {
+        const data = localStorage.getItem(STORAGE_KEY);
+        inventoryData = data ? JSON.parse(data) : [];
+    }
+
+    function saveData() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(inventoryData));
+    }
+    
+    function showToast(message, type = 'success') {
+        toast.textContent = message;
+        toast.style.backgroundColor = type === 'success' ? '#22c55e' : (type === 'info' ? '#3b82f6' : '#ef4444');
+        toast.classList.add('show');
+        setTimeout(() => { toast.classList.remove('show'); }, 3000);
+    }
+
+    function renderAdminTable() {
+        loadData(); 
+        
+        let displayData = [...inventoryData];
+
+        // Apply sorting
+        displayData.sort((a, b) => {
+            let valA, valB;
+            const key = currentSort.key;
+
+            if (key === 'user') {
+                valA = (a.userChange === '是' && a.newUser) ? a.newUser : a.user;
+                valB = (b.userChange === '是' && b.newUser) ? b.newUser : b.user;
+            } else {
+                valA = a[key];
+                valB = b[key];
+            }
+            
+            valA = (typeof valA === 'string') ? valA : String(valA);
+            valB = (typeof valB === 'string') ? valB : String(valB);
+
+            const comparison = valA.localeCompare(valB, 'zh-Hans-CN');
+            return currentSort.dir === 'asc' ? comparison : -comparison;
+        });
+
+        adminTableBody.innerHTML = '';
+        if (displayData.length === 0) {
+            adminTableBody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-gray-500">目前無盤點資料。</td></tr>';
+            return;
+        }
+
+        displayData.forEach(item => {
+            const row = document.createElement('tr');
+            row.dataset.itemId = item.id;
+            const statusClass = item.status === '已完成' ? 'status-completed' : 'status-pending';
+            
+            let currentUserHTML = item.user || '';
+            if (item.userChange === '是' && item.newUser) {
+                currentUserHTML = `<span class="font-bold text-red-600" title="原使用者: ${item.user || ''}">${item.newUser}</span>`;
+            }
+
+            let recognizedNumberHTML = item.recognizedAssetNumber || '';
+            if (item.status === '已完成' && item.assetNumber !== item.recognizedAssetNumber) {
+                recognizedNumberHTML = `<span class="font-bold text-red-600" title="與選擇的編號不符">${item.recognizedAssetNumber}</span>`;
+            }
+
+            row.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900" data-field="assetNumber">${item.assetNumber || ''}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-gray-900">${recognizedNumberHTML}</td>
+                <td class="px-6 py-4 whitespace-nowrap"><span class="${statusClass}">${item.status}</span></td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                    ${item.imageUrl ? `<a href="${item.imageUrl}" target="_blank"><img src="${item.imageUrl}" alt="${item.assetNumber}" class="h-10 w-10 rounded-md object-cover"></a>` : '未上傳'}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-gray-900" data-field="user">${currentUserHTML}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-gray-900" data-field="owner">${item.owner || ''}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium" data-field="actions">
+                    <button class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-md text-sm font-semibold hover:bg-indigo-200 edit-btn" data-id="${item.id}">編輯</button>
+                </td>
+            `;
+            adminTableBody.appendChild(row);
+        });
+
+        // Update sort indicators
+        document.querySelectorAll('th[data-sort-by]').forEach(th => {
+            th.classList.remove('sorted');
+            const indicator = th.querySelector('.sort-indicator');
+            indicator.textContent = '↕️';
+        });
+        const activeTh = document.querySelector(`th[data-sort-by="${currentSort.key}"]`);
+        if (activeTh) {
+            activeTh.classList.add('sorted');
+            activeTh.querySelector('.sort-indicator').textContent = currentSort.dir === 'asc' ? '🔽' : '🔼';
+        }
+    }
+
+    function processInputData(lines, separator) {
+        if (lines.length === 0) {
+            showToast('匯入的資料不能為空！', 'error');
+            return;
+        }
+        
+        loadData();
+        const existingAssetNumbers = new Set(inventoryData.map(item => item.assetNumber));
+        
+        let addedCount = 0;
+        let formatError = false;
+        let duplicateCount = 0;
+
+        lines.forEach(line => {
+            const parts = line.split(separator).map(p => p.trim());
+            if (parts.length === 3) {
+                const assetNumber = parts[0];
+                if (existingAssetNumbers.has(assetNumber)) {
+                    duplicateCount++;
+                } else {
+                    inventoryData.push({
+                        id: inventoryData.length > 0 ? Math.max(...inventoryData.map(i => i.id)) + 1 : 1,
+                        assetNumber: assetNumber,
+                        user: parts[1],
+                        owner: parts[2],
+                        status: '未完成',
+                        imageUrl: null,
+                        userChange: '未確認',
+                        newUser: '',
+                        recognizedAssetNumber: ''
+                    });
+                    addedCount++;
+                    existingAssetNumbers.add(assetNumber);
+                }
+            } else {
+                if (line) formatError = true;
+            }
+        });
+
+        if (formatError) {
+            showToast(`部分行格式不符 (需有3個欄位)，請檢查後再試。`, 'error');
+            return;
+        }
+        
+        if (addedCount > 0) {
+            saveData();
+            renderAdminTable();
+            let message = `${addedCount} 個新項目已成功加入！`;
+            if (duplicateCount > 0) {
+                message += ` (${duplicateCount} 個重複項目已略過)`;
+            }
+            showToast(message);
+        } else if (duplicateCount > 0) {
+            showToast(`所有匯入項目皆已存在，共略過 ${duplicateCount} 個。`, 'info');
+        } else {
+            showToast('沒有可新增的項目。', 'error');
+        }
+    }
+
+    // ========== 事件監聽 ==========
+    csvImportBtn.addEventListener('click', () => {
+        csvFileInput.click();
+    });
+
+    csvFileInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const text = e.target.result;
+            const lines = text.trim().split(/\r\n|\n/).filter(line => line.trim() !== '');
+            processInputData(lines, ',');
+        };
+        reader.onerror = () => showToast('讀取檔案時發生錯誤。', 'error');
+        reader.readAsText(file, 'UTF-8');
+        csvFileInput.value = '';
+    });
+    
+    adminTableBody.addEventListener('click', (e) => {
+        const target = e.target;
+        const itemId = parseInt(target.dataset.id, 10);
+        const row = target.closest('tr');
+
+        if (target.classList.contains('edit-btn')) {
+            const item = inventoryData.find(i => i.id === itemId);
+            if (!item) return;
+
+            row.querySelector('[data-field="assetNumber"]').innerHTML = `<input type="text" class="edit-input" value="${item.assetNumber}">`;
+            row.querySelector('[data-field="user"]').innerHTML = `<input type="text" class="edit-input" value="${item.user}">`;
+            row.querySelector('[data-field="owner"]').innerHTML = `<input type="text" class="edit-input" value="${item.owner}">`;
+            
+            row.querySelector('[data-field="actions"]').innerHTML = `
+                <button class="bg-green-100 text-green-700 px-3 py-1 rounded-md text-sm font-semibold hover:bg-green-200 save-btn" data-id="${itemId}">儲存</button>
+                <button class="ml-2 bg-gray-100 text-gray-700 px-3 py-1 rounded-md text-sm font-semibold hover:bg-gray-200 cancel-btn" data-id="${itemId}">取消</button>
+            `;
+        } else if (target.classList.contains('save-btn')) {
+            const itemIndex = inventoryData.findIndex(i => i.id === itemId);
+            if (itemIndex === -1) return;
+
+            const newAssetNumber = row.querySelector('[data-field="assetNumber"] input').value;
+            const newUser = row.querySelector('[data-field="user"] input').value;
+            const newOwner = row.querySelector('[data-field="owner"] input').value;
+
+            inventoryData[itemIndex].assetNumber = newAssetNumber;
+            inventoryData[itemIndex].user = newUser;
+            inventoryData[itemIndex].owner = newOwner;
+            inventoryData[itemIndex].userChange = '未確認';
+            inventoryData[itemIndex].newUser = '';
+
+            saveData();
+            renderAdminTable();
+            showToast('資料已更新！');
+        } else if (target.classList.contains('cancel-btn')) {
+            renderAdminTable();
+        }
+    });
+
+    tableHeader.addEventListener('click', (e) => {
+        const header = e.target.closest('th');
+        if (!header || !header.dataset.sortBy) return;
+
+        const key = header.dataset.sortBy;
+        if (currentSort.key === key) {
+            currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+            currentSort.key = key;
+            currentSort.dir = 'asc';
+        }
+        renderAdminTable();
+    });
+
+    refreshBtn.addEventListener('click', () => {
+        renderAdminTable();
+        showToast('資料已重新整理。');
+    });
+
+    exportBtn.addEventListener('click', () => {
+        if (inventoryData.length === 0) {
+            showToast('沒有資料可以匯出。', 'error');
+            return;
+        }
+
+        let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+        csvContent += "財產編號,辨識編號,狀態,設備使用者,資產擁有者,照片(Base64連結)\n";
+
+        inventoryData.forEach(item => {
+            const currentUser = (item.userChange === '是' && item.newUser) ? item.newUser : item.user;
+            const row = [
+                item.assetNumber,
+                item.recognizedAssetNumber || '',
+                item.status, 
+                currentUser || '',
+                item.owner || '',
+                item.imageUrl || 'N/A'
+            ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',');
+            csvContent += row + "\n";
+        });
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        const inventoryName = document.getElementById('inventory-name').value.trim() || '盤點報告';
+        const timestamp = new Date().toISOString().slice(0, 10);
+        link.setAttribute("download", `${inventoryName}_${timestamp}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast('報表已開始下載！');
+    });
+
+    // ========== 初始化 ==========
+    renderAdminTable();
+});
+</script>
+
+</body>
+</html>

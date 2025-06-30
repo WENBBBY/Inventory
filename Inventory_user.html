@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2025年8月_測試機盤點📲</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- OCR Library -->
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', 'Noto Sans TC', sans-serif; }
+        /* Top-right toast */
+        .toast { position: fixed; top: 20px; right: 20px; background-color: #22c55e; color: white; padding: 1rem 1.5rem; border-radius: 0.5rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transform: translateX(200%); transition: transform 0.5s ease-in-out; z-index: 100; }
+        .toast.show { transform: translateX(0); }
+        /* Centered toast */
+        .toast-center {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            background-color: #374151; /* Gray-700 */
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transform: translate(-50%, -50%) scale(0.9);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 101;
+            pointer-events: none;
+        }
+        .toast-center.show {
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+        }
+        .spinner { border: 4px solid rgba(0, 0, 0, 0.1); width: 24px; height: 24px; border-radius: 50%; border-left-color: #4f46e5; animation: spin 1s ease infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-lg">
+        <header class="text-center mb-10">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">2025年8月_測試機盤點📲</h1>
+        </header>
+
+        <!-- ========== 使用者操作區塊 ========== -->
+        <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200">
+            <div class="space-y-4">
+                <div>
+                    <label for="asset-select" class="block text-sm font-medium text-gray-700 mb-1">1. 請選擇您的測試機財產編號：</label>
+                    <select id="asset-select" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        <option>讀取中...</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="photo-upload" class="block text-sm font-medium text-gray-700 mb-1">2. 拍照上傳（請確認財產編號清晰可見）</label>
+                    <input type="file" id="photo-upload" accept="image/*" class="hidden">
+                    <button type="button" id="custom-upload-button" class="mt-2 w-full text-blue-700 font-semibold py-2 px-4 rounded-md border border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors">
+                        拍照或選擇圖檔
+                    </button>
+                    <p id="file-name-display" class="mt-2 text-center text-sm text-gray-500 truncate"></p>
+                </div>
+                <div class="w-full bg-gray-100 rounded-md min-h-[150px] flex items-center justify-center mt-2">
+                    <img id="photo-preview" src="" alt="圖檔預覽" class="max-h-48 max-w-full rounded-md hidden">
+                    <span id="preview-placeholder" class="text-gray-400">圖檔預覽</span>
+                </div>
+                <!-- OCR Result -->
+                <div>
+                    <label for="ocr-result" class="block text-sm font-medium text-gray-700">系統辨識財產編號：</label>
+                    <div class="mt-1 flex items-center p-2 border border-gray-300 bg-gray-100 rounded-md">
+                        <input type="text" id="ocr-result" class="flex-grow bg-transparent border-0 focus:ring-0 text-gray-700" placeholder="上傳照片後將自動顯示辨識結果 ✔️" readonly>
+                        <div id="ocr-spinner" class="spinner hidden ml-2"></div>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">3. 此設備使用者是否需異動？</label>
+                    <div class="mt-2 flex items-center space-x-4">
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="user-change" value="no" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500" checked>
+                            <span class="ml-2 text-sm text-gray-700">否</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input type="radio" name="user-change" value="yes" class="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
+                            <span class="ml-2 text-sm text-gray-700">是</span>
+                        </label>
+                    </div>
+                </div>
+                <div id="new-user-input-container" class="hidden">
+                    <label for="new-user-name" class="block text-sm font-medium text-gray-700">若需異動，請輸入新使用者姓名：</label>
+                    <input type="text" id="new-user-name" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="請輸入姓名">
+                </div>
+                <div>
+                    <button id="submit-btn" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">
+                        確認並回傳
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-notification" class="toast"></div>
+    <div id="toast-center" class="toast-center"></div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // ========== DOM 元素 ==========
+    const assetSelect = document.getElementById('asset-select');
+    const photoUpload = document.getElementById('photo-upload');
+    const customUploadButton = document.getElementById('custom-upload-button');
+    const fileNameDisplay = document.getElementById('file-name-display');
+    const photoPreview = document.getElementById('photo-preview');
+    const previewPlaceholder = document.getElementById('preview-placeholder');
+    const submitBtn = document.getElementById('submit-btn');
+    const toast = document.getElementById('toast-notification');
+    const centerToast = document.getElementById('toast-center');
+    const userChangeRadios = document.querySelectorAll('input[name="user-change"]');
+    const newUserInputContainer = document.getElementById('new-user-input-container');
+    const newUserNameInput = document.getElementById('new-user-name');
+    const ocrResultInput = document.getElementById('ocr-result');
+    const ocrSpinner = document.getElementById('ocr-spinner');
+
+    // ========== 資料庫 ==========
+    const STORAGE_KEY = 'inventoryData';
+    let inventoryData = [];
+    let selectedImageData = null;
+
+    // ========== 核心功能 ==========
+    function loadData() {
+        const data = localStorage.getItem(STORAGE_KEY);
+        inventoryData = data ? JSON.parse(data) : [];
+    }
+
+    function saveData() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(inventoryData));
+    }
+    
+    function showToast(message, type = 'success') {
+        toast.textContent = message;
+        toast.style.backgroundColor = type === 'success' ? '#22c55e' : '#ef4444';
+        toast.classList.add('show');
+        setTimeout(() => { toast.classList.remove('show'); }, 3000);
+    }
+
+    function showCenterToast(message) {
+        centerToast.textContent = message;
+        centerToast.classList.add('show');
+        setTimeout(() => {
+            centerToast.classList.remove('show');
+        }, 2500);
+    }
+    
+    function renderUserSelector() {
+        loadData();
+        assetSelect.innerHTML = '';
+        const pendingItems = inventoryData.filter(item => item.status === '未完成');
+
+        if (inventoryData.length === 0) {
+            assetSelect.innerHTML = '<option>目前無盤點任務 ✨</option>';
+            return;
+        }
+
+        if (pendingItems.length === 0) {
+            assetSelect.innerHTML = '<option>所有項目皆已盤點完成！</option>';
+            return;
+        }
+
+        pendingItems.forEach(item => {
+            const option = document.createElement('option');
+            option.value = item.assetNumber;
+            option.textContent = item.assetNumber;
+            assetSelect.appendChild(option);
+        });
+    }
+
+    async function recognizeTextFromImage(image) {
+        ocrResultInput.value = '';
+        ocrResultInput.placeholder = '辨識中...';
+        ocrSpinner.classList.remove('hidden');
+        try {
+            const { data: { text } } = await Tesseract.recognize(image, 'eng', {
+                logger: m => console.log(m) 
+            });
+            ocrResultInput.value = text.trim();
+        } catch (error) {
+            console.error('OCR Error:', error);
+            ocrResultInput.placeholder = '辨識失敗';
+            showToast('文字辨識失敗，請嘗試更清晰的照片。', 'error');
+        } finally {
+            ocrSpinner.classList.add('hidden');
+            if(!ocrResultInput.value) {
+                 ocrResultInput.placeholder = '辨識失敗，請手動確認。';
+            }
+        }
+    }
+
+    // ========== 事件監聽 ==========
+    customUploadButton.addEventListener('click', () => {
+        photoUpload.click();
+    });
+
+    userChangeRadios.forEach(radio => {
+        radio.addEventListener('change', (event) => {
+            if (event.target.value === 'yes') {
+                newUserInputContainer.classList.remove('hidden');
+            } else {
+                newUserInputContainer.classList.add('hidden');
+                newUserNameInput.value = '';
+            }
+        });
+    });
+
+    photoUpload.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            fileNameDisplay.textContent = `已選擇：${file.name}`;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                selectedImageData = e.target.result;
+                photoPreview.src = selectedImageData;
+                photoPreview.classList.remove('hidden');
+                previewPlaceholder.classList.add('hidden');
+                recognizeTextFromImage(selectedImageData);
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    submitBtn.addEventListener('click', () => {
+        const selectedAssetNumber = assetSelect.value;
+        const userChangeValue = document.querySelector('input[name="user-change"]:checked').value;
+        const newUserName = newUserNameInput.value.trim();
+        const ocrResult = ocrResultInput.value.trim();
+        const firstOptionText = assetSelect.options.length > 0 ? assetSelect.options[0].textContent : '';
+
+        if (!selectedAssetNumber || firstOptionText.includes('所有項目皆已盤點完成') || firstOptionText.includes('目前無盤點任務')) {
+            showCenterToast('目前無盤點任務 ✨');
+            return;
+        }
+        
+        // 統一檢查所有必填欄位
+        if (!selectedImageData || (userChangeValue === 'yes' && !newUserName)) {
+            showToast('請再次確認欄位是否皆已完成填寫 🥹', 'error');
+            return;
+        }
+
+        const itemIndex = inventoryData.findIndex(item => item.assetNumber === selectedAssetNumber);
+        if (itemIndex > -1) {
+            inventoryData[itemIndex].status = '已完成';
+            inventoryData[itemIndex].imageUrl = selectedImageData;
+            inventoryData[itemIndex].userChange = userChangeValue === 'yes' ? '是' : '否';
+            inventoryData[itemIndex].newUser = newUserName;
+            inventoryData[itemIndex].recognizedAssetNumber = ocrResult;
+            
+            saveData();
+            renderUserSelector();
+            
+            // 重設表單
+            photoPreview.classList.add('hidden');
+            previewPlaceholder.classList.remove('hidden');
+            photoPreview.src = '';
+            photoUpload.value = '';
+            fileNameDisplay.textContent = '';
+            selectedImageData = null;
+            document.querySelector('input[name="user-change"][value="no"]').checked = true;
+            newUserInputContainer.classList.add('hidden');
+            newUserNameInput.value = '';
+            ocrResultInput.value = '';
+            ocrResultInput.placeholder = '上傳照片後將自動顯示辨識結果 ✔️';
+            
+            showToast('已完成，感謝您 🥳');
+        }
+    });
+
+    // ========== 初始化 ==========
+    renderUserSelector();
+});
+</script>
+
+</body>
+</html>
